@@ -1,20 +1,3 @@
-// big_refactor.cpp
-// Educational, single-file project
-// Features:
-//  - User login/signup with hashed passwords (custom DJB-style hash)
-//  - Separated classes for Image, File, Text crypto and Stego (hiding files inside images)
-//  - Separate encrypt() and decrypt() methods for each class
-//  - Output files are automatically placed in the same directory as the input file
-//  - Lots of comments and verbose structure for clarity
-//
-// Compile:
-//   g++ -std=c++17 -O2 big_refactor.cpp -o big_refactor
-//
-// Usage:
-//   ./big_refactor
-//
-// Warning: XOR-based cipher is not secure. Use only for learning/demos.
-
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -411,10 +394,6 @@ public:
         return true;
     }
 };
-
-// ============================================================================
-// FileCrypto: separate encrypt() and decrypt() methods for generic files
-// ============================================================================
 
 class FileCrypto : public BaseCrypto
 {
@@ -954,13 +933,6 @@ public:
     }
 };
 
-// ============================================================================
-// UI: Menus and orchestration
-// - User menu (login/signup/exit)
-// - Once logged in, ask for password again for key derivation
-// - Main menu with separate options calling the respective class methods
-// ============================================================================
-
 static void printMainMenuOptions()
 {
     cout << "\n====== MAIN MENU ======\n";
@@ -976,15 +948,14 @@ static void printMainMenuOptions()
     cout << "Enter choice: ";
 }
 
-static void mainMenuFlow(UserManager &userManager, const string &username)
+static void mainMenuFlow(UserManager &userManager)
 {
-    // instantiate class objects
     ImageCrypto imageCrypto;
     FileCrypto fileCrypto;
     TextCrypto textCrypto;
     Stego stego;
 
-    cout << "Enter your password again for encryption key: ";
+    cout << "Enter the password for making the encryption key: ";
     string password;
     std::getline(cin, password);
     unsigned long long key = userManager.getKey(password);
@@ -1156,16 +1127,10 @@ static void mainMenuFlow(UserManager &userManager, const string &username)
         }
         default:
             cout << "Invalid choice. Enter number 1-9.\n";
-        } // switch
-
-        // small pause to improve readability of outputs
+        }
         waitShort();
-    } // while
+    }
 }
-
-// ============================================================================
-// Top-level user menu: login / signup / exit
-// ============================================================================
 
 int main()
 {
@@ -1204,7 +1169,7 @@ int main()
             if (userManager.login(username, password))
             {
                 // user logged in -> go to main menu flow
-                mainMenuFlow(userManager, username);
+                mainMenuFlow(userManager);
             }
             break;
         }
