@@ -31,13 +31,9 @@ static const string base64_chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
     "0123456789+/";
-// ============================================================================
-// Helper utilities (file paths, progress, prompts)
-// ============================================================================
 
 static void waitShort()
 {
-    // small convenience pause to let user read messages; non-blocking feel
     std::this_thread::sleep_for(std::chrono::milliseconds(120));
 }
 
@@ -56,7 +52,6 @@ static string trim(const string &s)
 
 static string dirname_of(const string &path)
 {
-    // return directory part; if no directory, return current dir "."
     if (path.empty())
         return ".";
     try
@@ -69,7 +64,6 @@ static string dirname_of(const string &path)
     }
     catch (...)
     {
-        // fallback naive parsing
         size_t pos1 = path.find_last_of("/\\");
         if (pos1 == string::npos)
             return ".";
@@ -123,7 +117,6 @@ static uint64_t filesize_bytes(const string &path)
     }
     catch (...)
     {
-        // fallback: try to open and measure
         ifstream in(path, ios::binary);
         if (!in)
             return 0;
@@ -136,16 +129,15 @@ static uint64_t filesize_bytes(const string &path)
 
 static string make_output_same_dir(const string &inputPath, const string &suffix, const string &forcedExt = "")
 {
-    // Create an output filename placed in same directory as input
+
     string dir = dirname_of(inputPath);
     string base = basename_of(inputPath);
     string ext = extension_of(inputPath);
-    // if forcedExt is provided, use it (must start with '.' if present)
+
     string outExt = forcedExt.empty() ? ext : forcedExt;
     if (outExt.empty())
-        outExt = ""; // could be no extension
+        outExt = "";
 
-    // strip original extension from base to append suffix
     string nameNoExt = base;
     if (!ext.empty())
     {
@@ -174,7 +166,7 @@ static bool confirm_overwrite_if_exists(const string &path)
 
 static void print_progress_bar(uint64_t processed, uint64_t total)
 {
-    // simple console progress bar
+
     if (total == 0)
         return;
     const int width = 40;
@@ -191,18 +183,13 @@ static void print_progress_bar(uint64_t processed, uint64_t total)
         cout << endl;
 }
 
-// ============================================================================
-// UserManager with custom hash (your provided code integrated)
-// ============================================================================
-
 class UserManager
 {
 private:
-    map<string, unsigned long long> users; // username -> password hash
+    map<string, unsigned long long> users;
 
     unsigned long long customHash(const string &password)
     {
-        // DJB-like hash (your version). deterministic mapping of password -> integer
         unsigned long long hash = 5381ULL;
         for (unsigned char c : password)
         {
@@ -214,7 +201,6 @@ private:
 public:
     UserManager()
     {
-        // predefined users
         users["admin"] = customHash("admin123");
         users["guest"] = customHash("guest123");
     }
@@ -253,22 +239,15 @@ public:
         return customHash(password);
     }
 
-    // Optional helper to check if user exists (used by external parts if needed)
     bool exists(const string &username)
     {
         return users.find(username) != users.end();
     }
 };
 
-// ============================================================================
-// BaseCrypto: shared helper for applying key to bytes
-// ============================================================================
-
 class BaseCrypto
 {
 protected:
-    // Apply key byte (derived from 64-bit key) to input char
-    // i is the byte index so the key cycles across 8 bytes
     static unsigned char keyByteFromKey(unsigned long long key, size_t i)
     {
         size_t shift = (i % 8) * 8;
@@ -283,17 +262,11 @@ protected:
     }
 };
 
-// ============================================================================
-// ImageCrypto: separate encrypt() and decrypt() methods
-// (For image files we treat them as binary and XOR the entire file)
-// ============================================================================
-
 class ImageCrypto : public BaseCrypto
 {
 public:
     ImageCrypto() = default;
 
-    // Encrypt: read input image and create encrypted output (same dir)
     bool encrypt(const string &inputPath, unsigned long long key)
     {
         string in = trim(inputPath);
@@ -303,7 +276,6 @@ public:
             return false;
         }
 
-        // Create output path in same directory with suffix "_enc"
         string out = make_output_same_dir(in, "_enc", extension_of(in).empty() ? ".img" : "");
         if (!confirm_overwrite_if_exists(out))
         {
@@ -311,7 +283,6 @@ public:
             return false;
         }
 
-        // Open files and XOR
         ifstream fin(in, ios::binary);
         ofstream fout(out, ios::binary);
         if (!fin || !fout)
@@ -332,7 +303,7 @@ public:
             ++idx;
             ++processed;
             if ((processed & 0x1FFF) == 0 || processed == total)
-            { // update occasionally
+            {
                 print_progress_bar(processed, total);
             }
         }
@@ -343,7 +314,6 @@ public:
         return true;
     }
 
-    // Decrypt: read an encrypted image and create decrypted output (same dir)
     bool decrypt(const string &inputPath, unsigned long long key)
     {
         string in = trim(inputPath);
@@ -353,7 +323,6 @@ public:
             return false;
         }
 
-        // Suggest restored extension .jpg if none present - keep original ext if possible
         string out = make_output_same_dir(in, "_dec", ".jpg");
         if (!confirm_overwrite_if_exists(out))
         {
@@ -459,42 +428,35 @@ public:
         string base = basename_of(in);
         string outName;
 
-        // Case 1: filename has "_enc" before extension -> strip it
         size_t posEnc = base.rfind("_enc");
         if (posEnc != string::npos)
         {
-            // Example: "Contents_pop_enc.enc"
-            // → remove "_enc" before extension
-            string withoutEnc = base.substr(0, posEnc);       // "Contents_pop"
-            string ext = fs::path(base).extension().string(); // ".enc"
 
-            // If extension is ".enc", try to restore original extension
+            string withoutEnc = base.substr(0, posEnc);
+            string ext = fs::path(base).extension().string();
+
             if (ext == ".enc")
             {
-                // Look for second extension (e.g., ".pdf" inside original)
-                string stem = fs::path(withoutEnc).stem().string();         // "Contents_pop"
-                string origExt = fs::path(withoutEnc).extension().string(); // ".pdf" if it was kept
+
+                string stem = fs::path(withoutEnc).stem().string();
+                string origExt = fs::path(withoutEnc).extension().string();
                 if (!origExt.empty())
                 {
-                    outName = stem + origExt; // Contents_pop.pdf
+                    outName = stem + origExt;
                 }
                 else
                 {
-                    outName = withoutEnc; // fallback
+                    outName = withoutEnc;
                 }
             }
             else
             {
-                outName = withoutEnc + ext; // fallback
+                outName = withoutEnc + ext;
             }
-
-            // Case 2: ends with ".enc" only -> strip it
         }
         else if (base.size() > 4 && base.substr(base.size() - 4) == ".enc")
         {
-            outName = base.substr(0, base.size() - 4); // file.pdf.enc -> file.pdf
-
-            // Case 3: no marker, just append _dec
+            outName = base.substr(0, base.size() - 4);
         }
         else
         {
@@ -541,8 +503,6 @@ public:
     }
 };
 
-// ---------------- Base64 Helpers ----------------
-// Convert vector<unsigned char> → Base64 string
 string base64Encode(const vector<unsigned char> &data)
 {
     static const char table[] =
@@ -567,7 +527,6 @@ string base64Encode(const vector<unsigned char> &data)
     return encoded;
 }
 
-// Convert Base64 string → vector<unsigned char>
 vector<unsigned char> base64Decode(const string &s)
 {
     static const int T[256] = {
@@ -587,7 +546,7 @@ vector<unsigned char> base64Decode(const string &s)
         if (T[c] == -1)
             break;
         if (T[c] == 64)
-            break; // '=' padding
+            break;
         val = (val << 6) + T[c];
         valb += 6;
         if (valb >= 0)
@@ -599,15 +558,11 @@ vector<unsigned char> base64Decode(const string &s)
     return out;
 }
 
-// ============================================================================
-// TextCrypto: separate encrypt() and decrypt() for strings (console I/O)
-// ============================================================================
 class TextCrypto : public BaseCrypto
 {
 public:
     TextCrypto() = default;
 
-    // Encrypt raw text or file
     bool encryptInput(const string &input, unsigned long long key, bool isFile)
     {
         string text;
@@ -637,7 +592,6 @@ public:
             text = input;
         }
 
-        // Encrypt
         vector<unsigned char> encrypted;
         encrypted.reserve(text.size());
         size_t idx = 0;
@@ -647,7 +601,6 @@ public:
             ++idx;
         }
 
-        // Convert to Base64 for safe printing
         string encoded = base64Encode(encrypted);
 
         cout << "Encrypted text (Base64): " << encoded << "\n";
@@ -670,7 +623,6 @@ public:
         return true;
     }
 
-    // Decrypt raw base64 text or from file
     bool decryptInput(const string &input, unsigned long long key, bool isFile)
     {
         string encBase64;
@@ -700,7 +652,6 @@ public:
             encBase64 = input;
         }
 
-        // Decode Base64 back to bytes
         vector<unsigned char> encrypted = base64Decode(encBase64);
 
         string decrypted;
@@ -732,12 +683,6 @@ public:
         return true;
     }
 };
-// ============================================================================
-// Stego: store file inside image and retrieve it
-// Implementation:
-//   - storeFileInImage: copy image bytes then append encrypted file bytes (XORed by key)
-//   - retrieveFileFromImage: skip original image bytes (user must provide image size) and decrypt appended bytes
-// ============================================================================
 
 class Stego : public BaseCrypto
 {
@@ -760,7 +705,6 @@ public:
             return false;
         }
 
-        // output image path in same dir as image
         string out = make_output_same_dir(img, "_stego", extension_of(img).empty() ? ".img" : "");
         if (!confirm_overwrite_if_exists(out))
         {
@@ -777,22 +721,16 @@ public:
             return false;
         }
 
-        // Copy image bytes
         fout << finImg.rdbuf();
 
-        // Append delimiter metadata: we append a short header indicating the original image size and file name length,
-        // but because you requested the retrieve to use the original image size as input, we'll keep header minimal.
-        // For safety we still append a small signature to indicate start of appended content.
-        // signature: 8 bytes "STEGOSTR" then 8 bytes uint64 little-endian for filename length, then filename bytes, then file content encrypted.
-        const string signature = "STEGOSTR"; // 8 chars
+        const string signature = "STEGOSTR";
         fout.write(signature.c_str(), static_cast<std::streamsize>(signature.size()));
 
         string hiddenFileName = basename_of(file);
         uint64_t nameLen = static_cast<uint64_t>(hiddenFileName.size());
-        fout.write(reinterpret_cast<const char *>(&nameLen), sizeof(nameLen)); // write 8-byte length
+        fout.write(reinterpret_cast<const char *>(&nameLen), sizeof(nameLen));
         fout.write(hiddenFileName.c_str(), static_cast<std::streamsize>(hiddenFileName.size()));
 
-        // Now append encrypted file content
         uint64_t total = filesize_bytes(file);
         uint64_t processed = 0;
         char buffer;
@@ -828,7 +766,6 @@ public:
             return false;
         }
 
-        // Open file and seek to originalImageSize
         ifstream fin(img, ios::binary);
         if (!fin)
         {
@@ -844,20 +781,16 @@ public:
             return false;
         }
 
-        // Seek to the boundary where appended data begins
         fin.seekg(static_cast<std::streamoff>(originalImageSize), ios::beg);
 
-        // Read signature
         char sigBuf[9] = {0};
         fin.read(sigBuf, 8);
         string signature(sigBuf, 8);
         if (signature != "STEGOSTR")
         {
             cout << "Warning: signature not found at expected position. Retrieval may fail.\n";
-            // we will attempt to continue, but user must ensure correct image size
         }
 
-        // Read filename length
         uint64_t nameLen = 0;
         fin.read(reinterpret_cast<char *>(&nameLen), sizeof(nameLen));
         if (!fin)
@@ -867,7 +800,6 @@ public:
             return false;
         }
 
-        // Read filename
         string hiddenFileName;
         if (nameLen > 0)
         {
@@ -882,11 +814,10 @@ public:
         }
         else
         {
-            // default name if nameLen invalid
+
             hiddenFileName = "recovered_file.bin";
         }
 
-        // Prepare output path in same directory as image-with-file
         string dir = dirname_of(img);
         string outPath = (fs::path(dir) / fs::path(string("recovered_") + hiddenFileName)).string();
         if (!confirm_overwrite_if_exists(outPath))
@@ -904,7 +835,6 @@ public:
             return false;
         }
 
-        // Now read remainder of file and decrypt
         char buffer;
         size_t idx = 0;
         uint64_t processed = 0;
@@ -1166,7 +1096,6 @@ int main()
             password = trim(password);
             if (userManager.login(username, password))
             {
-                // user logged in -> go to main menu flow
                 mainMenuFlow(userManager);
             }
             break;
