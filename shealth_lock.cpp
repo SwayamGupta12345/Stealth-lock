@@ -217,8 +217,6 @@ public:
         // predefined users
         users["admin"] = customHash("admin123");
         users["guest"] = customHash("guest123");
-        users["john"] = customHash("doe123");
-        users["alice"] = customHash("alice@123");
     }
 
     bool signup(const string &username, const string &password)
